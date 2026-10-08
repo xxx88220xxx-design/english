@@ -887,6 +887,7 @@ function touchDay() {
    ========================================================= */
 RENDER.home = function () {
   paintProgress();
+  paintAdapt();
   // السيناريوهات
   $("#homeScen").innerHTML = window.AI.SCENARIOS.map(s =>
     `<div class="scard2" style="min-width:240px" data-scen="${s.id}">
@@ -1642,19 +1643,19 @@ RENDER.scenarios = function () {
   $$("#scenGrid [data-s]").forEach(e => e.onclick = () => openScenario(e.dataset.s));
 }
 let SC = null;
+let SC_VOICE = false;
 function openScenario(id) {
   const s = window.AI.SCENARIOS.find(x => x.id === id); if (!s) return;
   SC = { s, step: 0, log: [{ r: "bot", t: s.start, a: s.startAr }] };
   renderScen();
   go("scenario");
+  if (SC_VOICE) { try { speak(s.start, 0.92); } catch (e) {} }
 }
 function renderScen() {
   const { s } = SC;
   $("#scenBody").innerHTML = `<div class="scen-stage">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div class="u-ico" style="width:52px;height:52px;font-size:26px">${s.icon}</div>
-      <div><h1 style="font-size:21px">${s.title}</h1><div class="en" style="color:var(--tx2)">${s.ar}</div></div>
-    </div>
+    <div class="scen-bg" style="background:${s.bgc}"><span class="scen-bg-em">${s.bg || s.icon}</span>
+      <div><b>${esc(s.title)}</b><small>${esc(s.ar)}</small></div></div>
     <div class="scen-role"><b>دورك:</b> أنت الزبون/الضيف. <b>دور المساعد:</b> ${s.role}</div>
     <div class="step-dots" id="sDots"></div>
     <div class="scen-log" id="sLog"></div>
@@ -1666,12 +1667,15 @@ function renderScen() {
       <button class="send">➤</button>
     </form>
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn sm ${SC_VOICE ? "" : "ghost"}" id="voiceMode">🗣️ ${SC_VOICE ? "وضع صوتي مفعّل ✓" : "وضع صوتي (صوت إلى صوت)"}</button>
       <button class="btn sm ghost" id="sHintBtn">💡 أعطني تلميحاً</button>
       <button class="btn sm ghost" id="sSkip">⏭ تخطَّ المرحلة</button>
       <button class="btn sm ghost" id="sRestart">↺ من البداية</button>
     </div>
   </div>`;
   paintScen();
+  const vm = $("#voiceMode");
+  if (vm) vm.onclick = () => { SC_VOICE = !SC_VOICE; renderScen(); toast(SC_VOICE ? "🔊 الصوت مفعّل: يتحدث المساعد ويردّ تلقائياً — أجب بالمايك 🎤" : "وضع الرد الكتابي"); };
   $("#sForm").onsubmit = e => { e.preventDefault(); hideLive(); scenAnswer(); };
   const sm = $("#sMicBtn");
   if (sm) sm.onclick = () => startMic($("#sMicBtn"),
@@ -1711,7 +1715,9 @@ function scenAnswer() {
   inp.value = "";
   const fixes = window.AI.correct(v);
   if (fixes.length) SC.log[SC.log.length - 1].fix = fixes;
-  if (!t) { SC.log.push({ r: "bot", t: "That was the end of the role-play. Well done! 🎉", a: "هذا كان نهاية التمثيل. أحسنت! 🎉" }); paintScen(); return; }
+  if (!t) { SC.log.push({ r: "bot", t: "That was the end of the role-play. Well done! 🎉", a: "هذا كان نهاية التمثيل. أحسنت! 🎉" }); paintScen();
+    if (SC_VOICE) { try { speak("That was the end. Well done!", 0.95); } catch (e) {} }
+    return; }
   let good = false;
   const nt = window.AI.norm(v);
   good = t.expect.some(k => nt.includes(window.AI.norm(k)));
@@ -1721,6 +1727,7 @@ function scenAnswer() {
       try { speak(t.reply, 0.95); } catch (e) {}
     } else {
       SC.log.push({ r: "bot", t: "Not quite. Try again 🙂", a: "ليس تماماً. حاول مرة أخرى 🙂", tip: t.hint });
+      if (SC_VOICE) { const h = t.hint.replace(/[A-Za-z][^\n]*?\./g, "").split(/[.!]|\n/)[0] || "Try again, you are close"; try { speak("Almost. " + h, 0.95); } catch (e) {} }
     }
     SC.step++;
     paintScen();
@@ -1831,7 +1838,8 @@ function doSearch(q) {
   if (!q) { out.innerHTML = `<div class="empty"><div class="e">🔍</div>اكتب كلمة للبحث — بالإنجليزية أو العربية</div>`; return; }
   const words = allWords().filter(x => x.w.en.toLowerCase().includes(q) || x.w.ar.includes(q) || x.w.pr.includes(q));
   const units = ALL.filter(u => (u.title + " " + u.titleEn + " " + u.goal).toLowerCase().includes(q));
-  let h = "";
+  const colloc = collocPanel(q);
+  let h = colloc;
   if (words.length) h += `<h2 class="sec">🔤 كلمات (${words.length})</h2>` + words.slice(0, 60).map(x =>
     `<div class="sres" data-u="${x.u.id}">
       <button class="w-btn" data-say="${esc(x.w.en)}">🔊</button>
@@ -1842,7 +1850,7 @@ function doSearch(q) {
     `<div class="sres" data-u="${u.id}"><div class="u-ico" style="width:34px;height:34px;font-size:17px">${u.icon}</div>
      <div><div class="en">${esc(u.title)}</div><div class="u">${esc(u.titleEn)}</div></div>
      <span class="badge ${u.level.toLowerCase()}">${u.level}</span></div>`).join("");
-  if (!words.length && !units.length) h = `<div class="empty"><div class="e">😕</div>لا توجد نتائج لـ «${esc(q)}»<br><span style="font-size:13px">جرّب كلمة أقصر</span></div>`;
+  if (!words.length && !units.length && !colloc) h = `<div class="empty"><div class="e">😕</div>لا توجد نتائج لـ «${esc(q)}»<br><span style="font-size:13px">جرّب كلمة أقصر</span></div>`;
   out.innerHTML = h;
   $$("#searchOut .sres").forEach(e => e.onclick = ev => {
     if (ev.target.closest("[data-say]")) { speak(ev.target.closest("[data-say]").dataset.say); return; }
@@ -2293,6 +2301,332 @@ function playListen() {
 function pauseListen() { LIST.playing = false; if (LIST.timer) { clearInterval(LIST.timer); LIST.timer = null; } if (window.speechSynthesis) speechSynthesis.cancel(); }
 function stopListen() { pauseListen(); LIST.i = 0; }
 
+/* =========================================================
+   قصص تفاعلية — اضغط أي كلمة لمعناها + سؤال فهم بعد كل فقرة
+   ========================================================= */
+const STORY_COLORS = ["linear-gradient(135deg,#7f5539,#f6bd60)", "linear-gradient(135deg,#1d3557,#4cc9f0)", "linear-gradient(135deg,#404f04,#55a630)"];
+function stColor(i) { return STORY_COLORS[i % STORY_COLORS.length]; }
+let STORY = null;
+let _wmap = null;
+function wordMap() {
+  if (_wmap) return _wmap;
+  _wmap = new Map();
+  allWords().forEach(x => { const k = x.w.en.toLowerCase(); if (!_wmap.has(k)) _wmap.set(k, x.w); });
+  return _wmap;
+}
+RENDER.stories = function () {
+  $("#storyGrid").innerHTML = window.STORIES.map((s, i) =>
+    `<div class="scard story-card" data-s="${i}">
+      <div class="st-bg" style="background:${stColor(i)}"><span class="st-emoji">${s.icon}</span></div>
+      <div class="st-body">
+        <div class="st-title"><b>${esc(s.title)}</b><span class="badge ${s.level.toLowerCase()}">${s.level}</span></div>
+        <div class="st-ar">${esc(s.ar)} · ${s.paras.length} فقرات</div>
+      </div>
+    </div>`).join("");
+  $$("#storyGrid [data-s]").forEach(e => e.onclick = () => openStory(+e.dataset.s));
+};
+function openStory(i) {
+  const s = window.STORIES[i]; if (!s) return;
+  STORY = { s, i, p: 0, words: [] };
+  renderStory();
+  go("story");
+}
+RENDER.story = function () {};
+function tokHTML(en) {
+  return en.split(/([A-Za-z\u2019']+)/).map(t => {
+    if (!t) return "";
+    if (/^[A-Za-z\u2019']+$/.test(t)) return `<span class="ww" data-w="${esc(t.toLowerCase())}">${esc(t)}</span>`;
+    return esc(t);
+  }).join("");
+}
+function storyWordInfo(w) {
+  const m = wordMap().get(w.toLowerCase());
+  if (m) return { en: m.en, pr: m.pr, ar: m.ar, ex: m.ex || null };
+  const g = (window.STORY_GLOSS || {})[w.toLowerCase()];
+  if (g) return { en: w.toLowerCase(), pr: g.pr, ar: g.ar, ex: null };
+  return null;
+}
+function markStorySeen(en) {
+  S.seen = S.seen || {};
+  S.srs = S.srs || {};
+  S.seen[en] = (S.seen[en] || 0) + 1;
+  if (!S.srs[en]) S.srs[en] = { lvl: 0, due: todayKey() };
+  save();
+}
+function storyWord(w, el) {
+  const info = storyWordInfo(w);
+  if (!info) { try { speak(w, 0.8); } catch (e) {} toast("كلمة خارج المنهج — سمعتُها لك 🔊"); return; }
+  markStorySeen(info.en);
+  if (STORY && !STORY.words.includes(info.en)) STORY.words.push(info.en);
+  if (el) { $$(".ww.hl").forEach(x => x.classList.remove("hl")); el.classList.add("hl"); }
+  const pop = $("#storyPop");
+  pop.innerHTML = `<div class="sw-card">
+      <button class="icon" data-x>✕</button>
+      <div class="sw-en">${esc(info.en)}</div>
+      <div class="sw-pr">${esc(info.pr)}</div>
+      <div class="sw-ar">${esc(info.ar)}</div>
+      ${info.ex ? `<div class="sw-ex">${esc(info.ex.en)}</div><div class="sw-ex ar">${esc(info.ex.ar || "")}</div>` : ""}
+      <button class="btn" data-say>🔊 اسمعها</button>
+      <div class="sw-ok">✓ أُضيفت للبطاقات للمراجعة</div>
+    </div>`;
+  pop.classList.add("on");
+  const say = pop.querySelector("[data-say]");
+  if (say) say.onclick = () => { try { speak(info.en, 0.9, true); } catch (e) {} };
+  pop.querySelector("[data-x]").onclick = () => pop.classList.remove("on");
+  pop.onclick = e => { if (e.target === pop) pop.classList.remove("on"); };
+}
+function renderStory() {
+  const { s, i } = STORY;
+  const done = STORY.p, last = done >= s.paras.length;
+  let h = `<div class="story-top">
+     <div class="st-bg big" style="background:${stColor(i)}"><span class="st-emoji">${s.icon}</span></div>
+     <div><div class="st-title"><b>${esc(s.title)}</b><span class="badge ${s.level.toLowerCase()}">${s.level}</span></div>
+     <div class="st-ar">${esc(s.ar)}</div>
+     <div class="st-prog">فقرة ${Math.min(done + 1, s.paras.length)} من ${s.paras.length}</div></div></div>`;
+  if (last) {
+    h += `<div class="story-done">🎉 أنهيت القصة!<br><small>كل كلمة ضغطّتها صارت في 🃏 البطاقات للمراجعة.</small></div>`;
+    if (STORY.words.length) h += `<div class="story-wordlist">${STORY.words.map(w => `<span class="chip">${esc(w)}</span>`).join("")}</div>`;
+    h += `<div class="story-btns"><button class="btn big" data-go="cards">مراجعة البطاقات</button>
+      <button class="btn ghost" data-replay>↺ إعادة القراءة</button></div>`;
+    storyQNum(STORY.i);
+  } else {
+    const p = s.paras[done];
+    h += `<div class="story-para"><div class="sp-en">${tokHTML(p.en)}</div><div class="sp-ar">${esc(p.ar)}</div></div>`;
+    h += `<div class="story-q"><b class="sq-q">❓ ${esc(p.q)}</b>
+      <div class="sq-opts">${p.opts.map((o, oi) => `<button data-qopt="${oi}" class="sq-opt">${esc(o)}</button>`).join("")}</div>
+      <div class="sq-in"><button type="button" class="icon mic" id="sqMic" title="أجب صوتياً">🎤</button>
+        <input id="sqText" placeholder="أو اكتب إجابتك (عربي أو إنجليزي)…" autocomplete="off">
+        <button class="send" id="sqGo">➤</button></div>
+      <button class="btn sm ghost" data-skipq>تخطَّ السؤال</button></div>`;
+  }
+  $("#storyBody").innerHTML = h;
+  const goEl = $("#sqGo");
+  if (goEl) goEl.onclick = () => storyAnswer(($("#sqText").value || "").trim());
+  const sqi = $("#sqText");
+  if (sqi) sqi.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); storyAnswer((sqi.value || "").trim()); } };
+  const sqm = $("#sqMic");
+  if (sqm) sqm.onclick = () => startMic($("#sqMic"), t => { const i = $("#sqText"); if (i) i.value = t; }, () => storyAnswer(($("#sqText").value || "").trim()));
+  const skip = $("#storyBody [data-skipq]");
+  if (skip) skip.onclick = () => { STORY.p++; renderStory(); };
+  const rp = $("#storyBody [data-replay]");
+  if (rp) rp.onclick = () => { STORY.p = 0; STORY.words.length; renderStory(); };
+}
+function storyAnswer(text) {
+  if (!STORY) return;
+  const q = STORY.s.paras[STORY.p];
+  if (!text) { toast("اكتب الإجابة أو اختر خياراً"); return; }
+  const norm3 = s => window.AI.norm(s).replace(/[أإآ]/g, "ا").replace(/ى/g, "ي");
+  const nt = norm3(text);
+  const ok = norm3(q.opts[q.ans]) && nt.includes(norm3(q.opts[q.ans]));
+  if (ok) {
+    bumpActivity();
+    storyQNum(STORY.i);
+    toast("✅ إجابة صحيحة");
+    setTimeout(() => { STORY.p++; renderStory(); }, 350);
+  } else {
+    toast("❌ ليست الإجابة الصحيحة — حاول مرة أخرى");
+    const sqi = $("#sqText"); if (sqi) sqi.value = "";
+  }
+}
+function storyQNum(i) {
+  S.storyQ = S.storyQ || {};
+  S.storyQ[i] = (S.storyQ[i] || 0) + 1;
+  save();
+}
+
+/* =========================================================
+   المتلازمات اللفظية — تظهر في البحث الشامل
+   ========================================================= */
+function collocPanel(q) {
+  if (!window.COLLOCS) return "";
+  const L = (q || "").toLowerCase();
+  let hit = window.COLLOCS[L];
+  if (!hit && L.length >= 3) {
+    const pre = Object.keys(window.COLLOCS).find(k => k.startsWith(L));
+    if (pre) hit = window.COLLOCS[pre];
+  }
+  if (!hit) return "";
+  return `<h2 class="sec">🧩 متلازمات مع «${esc(L)}» <small>(${esc(hit.ar)})</small></h2>
+    <div class="colloc-wrap">${hit.items.map(c =>
+      `<div class="colloc">
+        <button class="w-btn" data-say="${esc(c.en)}">🔊</button>
+        <div><div class="en">${esc(c.en)}</div><div class="ar">${esc(c.ar)}</div></div>
+      </div>`).join("")}</div>
+    <p class="hint-line">👆 المتلازمات هي كلمات تأتي معاً دائماً — حفظها يجعلك تتحدث بشكل طبيعي.</p>`;
+}
+
+/* =========================================================
+   تحدي النطق اليومي — ٣ كلمات صعبة · ٦٠ ثانية · ملاحظة حرفية
+   ========================================================= */
+const PRON_POOL = [
+  { w: "thought", pr: "/θɔːt/", note: "حروف «gh» صامتة، و«ou» تُنطق /ɔː/ مثل كلمة «bought»", silent: [2, 3, 4, 5, 6] },
+  { w: "through", pr: "/θruː/", note: "«gh» صامتة — الكلمة تُنطق كأنها «thru»", silent: [2, 3, 4, 5, 6] },
+  { w: "schedule", pr: "/ˈʃedʒuːl/", note: "«sch» تُنطق /ʃ/ — لا تنطق الأحرف منفصلة", silent: [2] },
+  { w: "beautiful", pr: "/ˈbjuːtəfl/", note: "ثلاثة مقاطع: beau-ti-ful — «eau» تُنطق /juː/", silent: [] },
+  { w: "Wednesday", pr: "/ˈwenzdeɪ/", note: "حرف «d» صامت — إنها «Wenz-day»", silent: [2] },
+  { w: "comfortable", pr: "/ˈkʌmftəbl/", note: "الجملة تنطقها «KUMF-tə-bl» — الإملاء أطول من الصوت", silent: [3] },
+  { w: "enough", pr: "/ɪˈnʌf/", note: "«ough» تُنطق /ʌf/ — هنا «gh» صوت /f/", silent: [] },
+  { w: "clothes", pr: "/kloʊðz/", note: "لا تسقط «th» — انطقها /ð/ بوضوح", silent: [] },
+  { w: "everything", pr: "/ˈevriθɪŋ/", note: "انتبه لـ «th» في المنتصف — لسانك بين أسنانك", silent: [] },
+  { w: "knowledge", pr: "/ˈnɑːlɪdʒ/", note: "حرف «k» صامت — «naw-ledge»", silent: [0] },
+  { w: "February", pr: "/ˈfebrueri/", note: "تنطق «Feb-ru-ary» بسرعة — لا تمديد", silent: [] },
+  { w: "vegetable", pr: "/ˈvedʒtəbl/", note: "غالباً «vej-tə-bl» — الـ e بعد g مكبوتة", silent: [4] },
+  { w: "chocolate", pr: "/ˈtʃɒklət/", note: "«choc-let» — الـ o الثانية تكاد تختفي", silent: [2] },
+  { w: "favourite", pr: "/ˈfeɪvərɪt/", note: "بالنطق السريع «fay-vrit» — الـ ou مسترخية", silent: [3] },
+  { w: "especially", pr: "/ɪˈspeʃəli/", note: "تتابع سريع: es-pe-sha-lly", silent: [] },
+  { w: "hungry", pr: "/ˈhʌŋɡri/", note: "«ng» تُنطق /ŋ/ — لا تقل «hun-guh-ree»", silent: [] },
+  { w: "young", pr: "/jʌŋ/", note: "الـ «g» جزء من «ng» /ŋ/ — لا صوت منفصل", silent: [4] },
+  { w: "listen", pr: "/ˈlɪsn/", note: "حرف «t» صامت — «li-sn»", silent: [3] },
+  { w: "often", pr: "/ˈɔːfn/", note: "معظم المتحدثين يسقطون «t» — «of-fen»", silent: [3] },
+  { w: "friend", pr: "/frend/", note: "الـ «i» مطوية — «frend» بلا مدّ", silent: [2] }
+];
+function pronPick() {
+  S.pron = S.pron || {};
+  const dk = todayKey();
+  if (!S.pron[dk]) {
+    const seed = parseInt(dk.replace(/-/g, ""), 10) % PRON_POOL.length;
+    S.pron[dk] = { idx: [seed, (seed + 1) % PRON_POOL.length, (seed + 2) % PRON_POOL.length], done: [] };
+  }
+  return S.pron[dk];
+}
+let PRON_T = null;
+function pronTimerStop() { if (PRON_T) { clearInterval(PRON_T); PRON_T = null; } }
+function pronLetterHTML(it) {
+  const chars = it.w.split("");
+  return chars.map((c, ci) => {
+    const sl = (it.silent || []).includes(ci);
+    return `<span class="pr-ch ${sl ? "sl" : ""}">${esc(c)}</span>`;
+  }).join("");
+}
+function renderPron() {
+  const d = pronPick();
+  const doneAll = d.done && d.done.length >= d.idx.length;
+  const box = $("#pronDay");
+  let h = `<div class="pron-top">
+     <div class="pron-clock" id="pronClock"><b id="pronCount">${doneAll ? "انتهيت اليوم ✅" : "⏱ 60 ثانية"}</b></div>
+     <div class="pron-prog">${arNum(d.done ? d.done.length : 0)} / ${arNum(d.idx.length)} كلمات تحققت</div>
+   </div>`;
+  h += `<div class="pron-list">${d.idx.map((pi, k) => {
+    const it = PRON_POOL[pi];
+    const st = d.done.includes(k) ? "done" : "";
+    return `<div class="pron-card ${st}" data-k="${k}">
+      <div class="pr-head"><b>${esc(it.w)}</b><span class="pr-ipa">${esc(it.pr)}</span>
+        <button class="w-btn" data-say="${esc(it.w)}" title="اسمع النطق">🔊</button></div>
+      <div class="pr-tip">${esc(it.note)}</div>
+      <div class="pr-chars">${pronLetterHTML(it)}<span class="pr-key">${st === "done" ? "✓ ناجحة" : ""}</span></div>
+      <button class="btn ${st === "done" ? "ghost" : ""}" data-record="${k}">${st === "done" ? "↻ أعد النطق" : "🎤 سجّل نطقك"}</button>
+      <div class="pr-fb" id="prf-${k}"></div>
+    </div>`;
+  }).join("")}</div>`;
+  box.innerHTML = h;
+  const say = $("#pronDay [data-say]");
+  if (say) say.onclick = e => { e.stopPropagation(); try { speak(say.dataset.say, 0.8, true); } catch (err) {} };
+  $$("#pronDay [data-record]").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    if (!d.done.includes(+b.dataset.record)) {
+      pronKickTimer();
+    }
+    startMic(b, t => { const fb = $("#prf-" + b.dataset.record); if (fb) fb.innerHTML = `<span class="pr-listening">🎙️ أسمعك… («${esc(t)}»)</span>`; },
+      t => gradePron(+b.dataset.record, t));
+  });
+}
+function pronKickTimer() {
+  pronTimerStop();
+  const el = $("#pronCount");
+  let left = 60;
+  if (el) el.textContent = "⏱ " + left + " ثانية";
+  PRON_T = setInterval(() => {
+    left--;
+    if (el) el.textContent = left > 0 ? "⏱ " + left + " ثانية" : "انتهى الوقت! ⏰";
+    if (left <= 0) { pronTimerStop(); }
+  }, 1000);
+}
+function gradePron(k, tr) {
+  const d = pronPick();
+  const it = PRON_POOL[d.idx[k]];
+  const fb = $("#prf-" + k);
+  const nt = window.AI.norm(tr || "").replace(/[.!?,]/g, " ");
+  const target = it.w;
+  const exact = nt === target;
+  const near = nt.includes(target) || target.includes(nt) || (nt.length >= 5 && levenshtein(nt, target) <= 2);
+  if (exact || near) {
+    if (!d.done.includes(k)) d.done.push(k);
+    save();
+    markStorySeen(target);           // كلمات التحدي تدخل البطاقات
+    bumpActivity();
+    if (fb) fb.innerHTML = `<div class="pr-good">✅ نطق ${exact ? "ممتاز" : "قريب جداً"}! حرف واحد فقط يحتاج صقلاً.<br>ركّز على: ${esc(it.note)}</div>`;
+    if (d.done.length >= d.idx.length) { pronTimerStop(); renderPron(); return; }
+    renderPron();
+  } else {
+    const sl = (it.silent || []).filter((x, ci) => ci < it.w.length);
+    let focus = "";
+    if (sl.length) focus = `الحروف الباهتة أعلاه صامتة — لا تنطقها. حاول: <b>${esc(it.w.replace(/[^a-z]/gi, x => ""))}</b> لا بأس من متابعة الصوت 🔊`;
+    else focus = `استمع 🔊 وركّز على ${esc(it.w)} كاملة، ثم أعد المحاولة: «${esc(it.note)}»`;
+    if (fb) fb.innerHTML = `<div class="pr-bad">🎙️ ما سمعه المتصفح: «${esc(nt || tr || "—")}»<br>${focus}</div>`;
+  }
+}
+function levenshtein(a, b) {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = [];
+  for (let i = 0; i <= a.length; i++) m[i] = [i];
+  for (let j = 0; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return m[a.length][b.length];
+}
+RENDER.pronounce = function () {
+  pronTimerStop();
+  pronPick();
+  renderPron();
+};
+
+/* =========================================================
+   المحرك التكيفي — لاحظنا صعوبتك في هذا الدرس
+   ========================================================= */
+function adaptWeakUnit() {
+  const cnt = {}, byU = {};
+  const w = S.wrong || {};
+  for (const en in w) {
+    if ((w[en].n || 0) < 2) continue;
+    const m = wordMap().get(en.toLowerCase());
+    if (!m) continue;
+    const uid = (allWords().find(x => x.w.en.toLowerCase() === en.toLowerCase()) || {}).u;
+    if (!uid) continue;
+    const key = uid.id;
+    cnt[key] = (cnt[key] || 0) + w[en].n;
+    (byU[key] = byU[key] || []).push(en.toUpperCase());
+  }
+  let best = null, bn = 0;
+  for (const key in cnt) if (cnt[key] > bn) { bn = cnt[key]; best = key; }
+  if (!best) return null;
+  const u = ALL.find(x => x.id === best);
+  return u ? { u, n: bn, words: byU[best].slice(0, 6) } : null;
+}
+function paintAdapt() {
+  const box = $("#adaptBox");
+  if (!box) return;
+  const tip = adaptWeakUnit();
+  const bell = $("#adaptN");
+  const key = tip ? todayKey() + "#" + tip.u.id : "";
+  const hid = S.adaptHide || {};
+  const show = tip && !hid[key];
+  if (!show) { box.style.display = "none"; if (bell) bell.style.display = "none"; return; }
+  box.style.display = "";
+  if (bell) bell.style.display = "";
+  box.innerHTML = `<div class="adapt">
+    <span class="adap-ic">🧠</span>
+    <div class="adap-tx"><b>لاحظنا صعوبة في درس «${esc(tip.u.title)}»</b>
+      <small>${tip.n} أخطاء متكررة منك في كلماته — مراجعة سريعة تثبّت المعلومة.</small>
+      <small class="adap-w">${tip.words.map(esc).join(" · ")}</small></div>
+    <button class="btn sm" data-adap-go="${tip.u.id}">راجع الآن</button>
+    <button class="icon" data-adap-x="${tip.u.id}" title="الآن لا">✕</button>
+  </div>`;
+  box.querySelector("[data-adap-go]").onclick = () => { S.adaptHide = hid; hid[key] = 1; save(); openLesson(tip.u.id); };
+  box.querySelector("[data-adap-x]").onclick = () => { S.adaptHide = hid; hid[key] = 1; save(); paintAdapt(); };
+}
+
 /* ---------- الصوت: إملاء في المحادثة والتمثيل + التصحيح الفوري ---------- */
 let REC = null, liveT = null;
 function stopMic(btn) {
@@ -2402,6 +2736,30 @@ function init() {
   };
   // chat
   $("#chatForm").onsubmit = e => { e.preventDefault(); hideLive(); sendChat(); };
+  const nbEl = $("#naturalBtn");
+  if (nbEl) nbEl.onclick = e => { e.stopPropagation();
+    const inp = $("#chatInput");
+    let v = (inp.value || "").trim();
+    if (!v) { toast("اكتب جملة أولاً (عربي أو إنجليزي) ثم اضغط 🌿 Natural Way"); inp.focus(); return; }
+    const n = window.AI.natural(v);
+    if (!n) { toast("اكتب جملة أولاً"); return; }
+    inp.value = "";
+    addMsg({ r: "me", t: esc(v) });
+    let s = `🌿 إنجليزية أكثر حياةً:<br><b>${esc(n.text)}</b>`;
+    if (n.notes && n.notes.length) s += `<div class="ar">` + n.notes.map(x => esc(x)).join("<br>") + `</div>`;
+    addMsg({ r: "bot", t: s, a: n.text !== n.original ? "حافظنا على المعنى وغيرنا الأسلوب ليقترب من المتحدث الأصلي." : "الجملة طبيعية بالفعل." });
+    bumpActivity();
+    try { speak(n.text, 0.92); } catch (err) {}
+  };
+  // deix engagement داخل القصة
+  const storySb = $("#storyBody");
+  if (storySb) storySb.addEventListener("click", e => {
+    if (!STORY) return;
+    const opt = e.target.closest("[data-qopt]");
+    if (opt) { const q = STORY.s.paras[STORY.p]; storyAnswer(q.opts[+opt.dataset.qopt]); return; }
+    const ww = e.target.closest(".ww");
+    if (ww) storyWord(ww.dataset.w, ww);
+  });
   $("#clearChat").onclick = () => { if (confirm("مسح المحادثة؟")) { S.chat = []; save(); RENDER.chat(); } };
   $$("#chatSeg button").forEach(b => b.onclick = () => { $$("#chatSeg button").forEach(x => x.classList.remove("on")); b.classList.add("on"); chatMode = b.dataset.cl; paintChips(); });
   $("#micBtn").onclick = () => startMic($("#micBtn"), t => { const i = $("#chatInput"); i.value = t; i.selectionStart = i.selectionEnd = (t || "").length; $("#botStat").textContent = "أصغٍ إليك…"; }, () => { $("#botStat").textContent = "جاهز للمحادثة"; sendChat(); });

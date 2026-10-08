@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0d1117">
 <title>إنجليزي | A0 → A2 · موقع متكامل لتعلم الإنجليزية</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🇬🇧</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=f1d7a0ed">
+<link rel="stylesheet" href="css/style.css?v=d8216e50">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -86,13 +86,15 @@ setTimeout(function () { if (!window.__BOOT) window.__showBootErr(); }, 7000);
 
   <nav class="side-nav">
     <p class="nav-lbl">التعلم</p>
-    <a class="nv" data-nav="home"><i>🏠</i> الرئيسية</a>
+    <a class="nv" data-nav="home"><i>🏠</i> الرئيسية <em id="adaptN" class="bell" style="display:none">🔔</em></a>
     <a class="nv" data-nav="lessons"><i>📚</i> الدروس <em id="cntL">0</em></a>
     <a class="nv" data-nav="top"><i>⭐</i> أهم الكلمات <em id="cntT">0</em></a>
     <a class="nv" data-nav="cards"><i>🃏</i> البطاقات <em id="cntC">0</em></a>
     <a class="nv" data-nav="daily"><i>🗓️</i> يومي <em id="cntD">0</em></a>
     <a class="nv" data-nav="quiz"><i>🧠</i> الاختبارات</a>
     <a class="nv" data-nav="listen"><i>🎧</i> استماع</a>
+    <a class="nv" data-nav="stories"><i>📖</i> قصص تفاعلية</a>
+    <a class="nv" data-nav="pronounce"><i>🗣️</i> تحدي النطق</a>
     <a class="nv" data-nav="mistakes"><i>❌</i> أخطائي <em id="cntW">0</em></a>
     <a class="nv" data-nav="verbs"><i>⚡</i> الأفعال الشاذة</a>
     <a class="nv" data-nav="letters"><i>🔤</i> نطق الحروف</a>
@@ -155,11 +157,15 @@ setTimeout(function () { if (!window.__BOOT) window.__showBootErr(); }, 7000);
         <button class="icon" id="closeBar" title="إخفاء">✕</button>
       </div>
 
+      <div id="adaptBox"></div>
+
       <div class="grid4">
         <div class="scard" data-go="lessons"><i>📚</i><b>الدروس</b><small>٣٢ درساً من A0 إلى A2</small></div>
         <div class="scard" data-go="cards"><i>🃏</i><b>بطاقات المراجعة</b><small>تكرار متباعد ذكي</small></div>
         <div class="scard" data-go="quiz"><i>🧠</i><b>اختبر نفسك</b><small>٥ أنواع أسئلة</small></div>
         <div class="scard" data-go="chat"><i>🤖</i><b>محادثة ذكية</b><small>محادثة بدون أخطاء</small></div>
+        <div class="scard" data-go="stories"><i>📖</i><b>قصص تفاعلية</b><small>اقرأ واضغط أي كلمة</small></div>
+        <div class="scard" data-go="pronounce"><i>🗣️</i><b>تحدي النطق</b><small>٦٠ ثانية يومياً</small></div>
       </div>
 
       <h2 class="sec">🎬 تمثيل الأدوار — تدرّب بمحادثة حقيقية</h2>
@@ -341,6 +347,7 @@ setTimeout(function () { if (!window.__BOOT) window.__showBootErr(); }, 7000);
         <div class="chat-top">
           <div class="bot-av">🤖</div>
           <div class="bot-info"><b>المعلم الذكي</b><small id="botStat">جاهز للمحادثة</small></div>
+          <button class="chip" id="naturalBtn" title="حوّل جملك إلى إنجليزية طبيعية حيّة">🌿 Natural Way</button>
           <button class="icon" id="clearChat" title="مسح">🗑</button>
         </div>
         <div class="chat-log" id="chatLog"></div>
@@ -366,6 +373,26 @@ setTimeout(function () { if (!window.__BOOT) window.__showBootErr(); }, 7000);
     <section class="view" id="v-scenario">
       <button class="back" data-go="scenarios">→ رجوع</button>
       <div id="scenBody"></div>
+    </section>
+
+    <!-- ============ القصص ============ -->
+    <section class="view" id="v-stories">
+      <div class="page-head"><h1>📖 قصص تفاعلية</h1></div>
+      <p class="lead">اقرأ القصة واضغط على <b>أي كلمة</b> — يظهر معناها ونطقها وتُحفظ تلقائياً في البطاقات. بعد كل فقرة سؤال فهم. أجبه كتابةً أو صوتياً 🎤.</p>
+      <div id="storyGrid"></div>
+    </section>
+
+    <!-- ============ القصة ============ -->
+    <section class="view" id="v-story">
+      <button class="back" data-go="stories">→ رجوع</button>
+      <div id="storyBody"></div>
+    </section>
+
+    <!-- ============ تحدي النطق ============ -->
+    <section class="view" id="v-pronounce">
+      <div class="page-head"><h1>🗣️ تحدي النطق اليومي</h1></div>
+      <p class="lead" id="pronLead">٣ كلمات صعبة كل يوم · ٦٠ ثانية · سجّل نطقك بالمايكروفون واعرف أين خطأك بالضبط.</p>
+      <div id="pronDay"></div>
     </section>
 
     <!-- ============ الأفعال الشاذة ============ -->
@@ -436,11 +463,14 @@ setTimeout(function () { if (!window.__BOOT) window.__showBootErr(); }, 7000);
 </main>
 
 <div id="toast"></div>
+<div id="storyPop" class="over"></div>
 
-<script src="js/data-a1.js?v=f1d7a0ed"></script>
-<script src="js/data-a2.js?v=f1d7a0ed"></script>
-<script src="js/ai.js?v=f1d7a0ed"></script>
-<script src="js/top200.js?v=f1d7a0ed"></script>
-<script src="js/app.js?v=f1d7a0ed"></script>
+<script src="js/data-a1.js?v=d8216e50"></script>
+<script src="js/data-a2.js?v=d8216e50"></script>
+<script src="js/stories.js?v=d8216e50"></script>
+<script src="js/collocs.js?v=d8216e50"></script>
+<script src="js/ai.js?v=d8216e50"></script>
+<script src="js/top200.js?v=d8216e50"></script>
+<script src="js/app.js?v=d8216e50"></script>
 </body>
 </html>

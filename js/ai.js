@@ -363,6 +363,7 @@ window.AI = (function () {
   const SCENARIOS = [
     {
       id: "cafe", icon: "☕", title: "في المقهى", ar: "طلب مشروبات وطعام",
+      bg: "🍵", bgc: "linear-gradient(135deg,#7b4b2a,#e9c46a)",
       role: "You are the barista. Greet the customer and take their order.",
       start: "Hi there! What can I get for you today?",
       startAr: "أهلاً! ماذا تحب أن أحضر لك اليوم؟",
@@ -386,6 +387,7 @@ window.AI = (function () {
     },
     {
       id: "shop", icon: "🛍️", title: "في المحل", ar: "الشراء وطلب المقاس",
+      bg: "👕", bgc: "linear-gradient(135deg,#2a6f97,#a8dadc)",
       role: "You are a shop assistant. Help the customer find the right size.",
       start: "Hello! Can I help you find anything?",
       startAr: "مرحباً! هل يمكنني مساعدتك في إيجاد شيء؟",
@@ -409,6 +411,7 @@ window.AI = (function () {
     },
     {
       id: "hotel", icon: "🏨", title: "استقبال الفندق", ar: "الحجز والاستفسار",
+      bg: "🛎️", bgc: "linear-gradient(135deg,#5f0f40,#9a031e)",
       role: "You are the receptionist. Check the guest in.",
       start: "Good evening, and welcome. Do you have a reservation?",
       startAr: "مساء الخير، أهلاً بك. هل لديك حجز؟",
@@ -433,6 +436,7 @@ window.AI = (function () {
     },
     {
       id: "doctor", icon: "🩺", title: "عند الطبيب", ar: "وصف الأعراض",
+      bg: "💊", bgc: "linear-gradient(135deg,#023e8a,#48cae4)",
       role: "You are the doctor. Ask about the symptoms and give advice.",
       start: "Good morning. Please sit down. What seems to be the problem?",
       startAr: "صباح الخير. اجلس من فضلك. ما المشكلة؟",
@@ -457,6 +461,7 @@ window.AI = (function () {
     },
     {
       id: "interview", icon: "💼", title: "مقابلة عمل", ar: "التقديم لنفسك",
+      bg: "🏢", bgc: "linear-gradient(135deg,#1b4332,#74c69d)",
       role: "You are the HR manager. Interview the candidate.",
       start: "Good morning, thank you for coming. Please sit down. Can you tell me about yourself?",
       startAr: "صباح الخير، شكراً لحضورك. اجلس من فضلك.حدثني عن نفسك.",
@@ -481,6 +486,7 @@ window.AI = (function () {
     },
     {
       id: "dir", icon: "🗺️", title: "اسأل عن الطريق", ar: "في المدينة الجديدة",
+      bg: "🛣️", bgc: "linear-gradient(135deg,#3d405b,#f2cc8f)",
       role: "You are a local. Give directions to the visitor.",
       start: "Excuse me, you look lost. Can I help you?",
       startAr: "عذراً، تبدو تائهاً. هل يمكنني مساعدتك؟",
@@ -566,12 +572,72 @@ window.AI = (function () {
     };
   }
 
+  /* ---------- 6. English حيّة (Natural Way) ---------- */
+  const NATURAL = [
+    { pat: "\\bvery (extremely )?happy\\b", to: "thrilled", note: "«thrilled» تعني سعيد جداً ومتحمس — أدق وأقوى من «very happy»." },
+    { pat: "\\bvery (extremely )?tired\\b", to: "exhausted", note: "«exhausted» تعني مرهق تماماً — المتحدثون يستعملونها بدل very tired." },
+    { pat: "\\bvery good\\b", to: "awesome", note: "«awesome» كلمة يومية شائعة جداً بمعنى رائع." },
+    { pat: "\\bvery bad\\b", to: "terrible", note: "«terrible» تعني سيء جداً." },
+    { pat: "\\bvery big\\b", to: "huge", note: "«huge» = ضخم — بدل very big." },
+    { pat: "\\bvery small\\b", to: "tiny", note: "«tiny» = صغير جداً." },
+    { pat: "\\bvery hot\\b", to: "boiling", note: "«boiling» تصف الحر الشديد." },
+    { pat: "\\bvery cold\\b", to: "freezing", note: "«freezing» تصف البرد القارص." },
+    { pat: "\\bvery hungry\\b", to: "starving", note: "«starving» = جائع جداً (مبالغة يومية)." },
+    { pat: "\\bvery thirsty\\b", to: "parched", note: "«parched» = عطشان جداً." },
+    { pat: "\\bvery angry\\b|\\bangry\\b", to: "mad", note: "المتحدثون يقولون «I'm mad» أكثر من «I'm angry»." },
+    { pat: "\\bvery funny\\b", to: "hilarious", note: "«hilarious» = مضحك جداً." },
+    { pat: "\\bvery delicious\\b", to: "mouth-watering", note: "«mouth-watering» تصف طعاماً يسيل له اللعاب." },
+    { pat: "\\bvery beautiful\\b", to: "gorgeous", note: "«gorgeous» تُقال للجمال الأخاذ." },
+    { pat: "\\bvery easy\\b", to: "a piece of cake", note: "«a piece of cake» مصطلح شهير بمعنى سهل جداً." },
+    { pat: "\\bvery (difficult|hard)\\b|\\b(difficult|hard)\\b", to: "tough", note: "«tough» = صعب/قاسٍ — كلمة شائعة جداً." },
+    { pat: "\\bI don't know\\b|\\bi do not know\\b", to: "I have no idea", note: "«I have no idea» أسلوب الحديث اليومي بمعنى لا أعرف إطلاقاً." },
+    { pat: "\\bI understand\\b", to: "I get it", note: "يقول المتحدثون «I get it» بدل «I understand»." },
+    { pat: "\\bI don't understand\\b", to: "I'm lost", note: "«I'm lost» بمعنى لم أفهم ومحتار." },
+    { pat: "\\bI am busy\\b|\\bi'm busy\\b", to: "I'm swamped", note: "«swamped» = غارق في العمل — تعبير يومي حي." },
+    { pat: "\\bvery much\\b", to: "a lot", note: "«a lot» أطبيعي من «very much» في الكلام." },
+    { pat: "\\bso much\\b", to: "a ton", note: "«a ton» مبالغة شائعة بمعنى كثير جداً." },
+    { pat: "\\bthanks a lot\\b|\\bthank you very much\\b", to: "thanks a million", note: "«thanks a million» شكر بالعامية الحية." },
+    { pat: "\\byou are welcome\\b|\\byou're welcome\\b", to: "no worries", note: "«no worries» إجابة طبيعية على «شكراً» — أكثر من you're welcome." },
+    { pat: "\\bsee you later\\b", to: "catch you later", note: "«catch you later» وداع ودود شائع." },
+    { pat: "\\bgoodbye\\b", to: "bye for now", note: "نهاية محادثة طبيعية بطريقة ودية." },
+    { pat: "\\bhello\\b", to: "hey", note: "«hey» أشد ألفة من hello." },
+    { pat: "\\bgood morning\\b", to: "morning", note: "المتحدثون يلخصونها لـ «Morning!»" },
+    { pat: "\\byes\\b", to: "yeah", note: "«yeah» النطق الطبيعي لـ yes في الكلام." },
+    { pat: "\\bchildren\\b", to: "kids", note: "«kids» هي الكلمة اليومية بدل children." },
+    { pat: "\\bfriend\\b", to: "buddy", note: "«buddy» = رفيق/صاحب — ودية أكثر." },
+    { pat: "\\bmoney\\b", to: "cash", note: "«cash» بمعنى النقود الجاهزة — يومية وعملية." },
+    { pat: "\\bfifteen minutes\\b", to: "quarter of an hour", note: "تعبير ثقافي: ربع ساعة (15 دقيقة)." },
+    { pat: "\\bgo to (?:the |a )?sleep\\b", to: "hit the sack", note: "«hit the sack» مصطلح أمريكي بمعنى النوم." },
+    { pat: "\\bhave breakfast\\b", to: "grab a bite", note: "«grab a bite» تستخدم لوجبة سريعة دون تكلّف." },
+    { pat: "\\bunderstand\\b", to: "get", note: "الفعل اليومي القصير «get» بدل understand." },
+    { pat: "\\bexpensive\\b", to: "pricey", note: "«pricey» = غالٍ بعض الشيء — حديثة وعفوية." },
+    { pat: "\\bdifficult\\b", to: "tricky", note: "«tricky» = صعب/خادع — كلمة أحبها المتحدثون." },
+    { pat: "\\bimmediately\\b", to: "right away", note: "«right away» أسلوب الحديث اليومي لـ immediately." }
+  ];
+
+  function natural(text) {
+    if (!text || !text.trim()) return null;
+    let out = text.trim().replace(/\s+/g, " ");
+    const notes = [];
+    for (const r of NATURAL) {
+      const re = new RegExp(r.pat, "gi");
+      if (!re.test(out)) continue;
+      out = out.replace(re, m => {
+        const cap = m[0] === m[0].toUpperCase();
+        return cap ? r.to.charAt(0).toUpperCase() + r.to.slice(1) : r.to;
+      });
+      notes.push(r.note);
+    }
+    return { original: text, text: out, notes: notes.slice(0, 4) };
+  }
+
   return {
     correct,
     answer,
     SCENARIOS,
     ASKERS,
     pick,
-    norm
+    norm,
+    natural
   };
 })();
