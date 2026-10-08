@@ -84,23 +84,124 @@ window.AI = (function () {
     { bad: /\bi very thanks\b/i, fix: "Thank you very much", why: "بعد very يأتي الصفة." },
     { bad: /\bat the moment i\b/i, fix: "At the moment, I…", why: "فاصلة بعد At the moment." },
     { bad: /\binformations?\s*on\b/i, fix: "information about", why: "information about." },
+    { bad: /\bpeoples\b/i, fix: "people", why: "people جمع مستقل بلا s." },
+    { bad: /\b(childs|childes)\b/i, fix: "children", why: "جمع child هو children." },
+    { bad: /\bpersons\b/i, fix: "people", why: "نقول people." },
+    { bad: /\bcloths\b/i, fix: "clothes", why: "الملابس = clothes." },
+    { bad: /\bevery days\b/i, fix: "every day", why: "بعد every نستعمل المفرد: every day." },
+    { bad: /\bdidn't (came|saw|ate|bought|took|went)\b/i, fix: "didn't + الفعل الأساسي", why: "بعد didn't يأتي الفعل بصورته الأساسية: didn't come." },
+    { bad: /\bi am born in\b/i, fix: "I was born in", why: "الولادة بالماضي: I was born in 2005." },
+    { bad: /\bcan to (?:go|play|come|eat|see|help|buy|take|read|write)\b/i, fix: "can + الفعل الأساسي", why: "بعد can لا نستعمل to: I can play." },
+    { bad: /\bmust to\b/i, fix: "must + الفعل الأساسي", why: "بعد must لا نستعمل to: I must study." },
+    { bad: /\b(want|need|would like) (?:play|go|come|eat|read|write|swim|travel)\b/i, fix: "الفعل + to + الفعل", why: "بعد want/need نستعمل to: I want to play." },
+    { bad: /\benjoy to (?:go|play|read|eat|travel|watch|swim)\b/i, fix: "enjoy + الفعل ing", why: "بعد enjoy يأتي الفعل + ing: I enjoy playing." },
+    { bad: /\bgo to walk\b/i, fix: "go for a walk", why: "نقول go for a walk." },
+    { bad: /\bi am (?:student|teacher|doctor|engineer)\b/i, fix: "I am a student", why: "مفرد معدود يحتاج a: a student." },
+    { bad: /\bhe (?:is|was) (?:student|teacher|doctor)\b/i, fix: "He is a student", why: "مفرد معدود يحتاج a: a teacher." },
+    { bad: /\bshe is very (?:pretty|beautiful|kind|smart) girl\b/i, fix: "a very pretty girl", why: "مفرد معدود يحتاج a." },
+    { bad: /\bthe (?:people|children|men|women) (?:is|has|was)\b/i, fix: "الجميع جمع ⇒ are/have", why: "people جمع ⇒ are / have." },
+    { bad: /\bi am (?:good|bad|tired) in english\b/i, fix: "I am good at English", why: "للبراعة نستعمل at: good at." },
+    { bad: /\bafraid from\b/i, fix: "afraid of", why: "نقول afraid of." },
+    { bad: /\bfull from\b/i, fix: "full of", why: "نقول full of." },
+    { bad: /\bproud from\b/i, fix: "proud of", why: "نقول proud of." },
+    { bad: /\bsince (?:two|three|four|five) days\b/i, fix: "for … days", why: "مع المدة: for. since لنقطة البداية." },
+    { bad: /\bthere is (?:many|a lot of|some|two|three|four|five|[0-9]+)\b/i, fix: "there are", why: "مع الجمع: there are." },
+    { bad: /\bthere are (?:a|an|one) (?:apple|book|car|cat|dog|pen|chair|table)\b/i, fix: "there is", why: "مع المفرد: there is." },
+    { bad: /\bdon't (?:says|wants|likes|plays|goes|works|reads|eats)\b/i, fix: "don't + الفعل الأساسي", why: "بعد don't لا نضيف s." },
+    { bad: /\bhe (?:says|want) to have\b/i, fix: "he wants…", why: "الغائب المفرد يحتاج s: he wants." },
+    { bad: /\byour welcome\b/i, fix: "you're welcome", why: "You're welcome (you are)." },
+    { bad: /\bwhy you are\b/i, fix: "why are you", why: "قلب السؤال: Why are you angry?" },
+    { bad: /\bwhat you (?:want|need|like)\b/i, fix: "what do you…", why: "السؤال يحتاج do: What do you want?" },
+    { bad: /\bhow you (?:feel|say|spell|do)\b/i, fix: "how do you…", why: "السؤال يحتاج do: How do you feel?" },
     { bad: /\bno\b/, fix: null, why: null } // placeholder, ignore
   ];
   CORRECTIONS.pop();
 
+  /* مطابقة الفعل + الأزمنة + السؤال (قواعد ديناميكية عالية الدقة) */
+  const V3 = { need:"needs", want:"wants", like:"likes", love:"loves", have:"has", go:"goes", do:"does", play:"plays", work:"works", speak:"speaks", read:"reads", eat:"eats", sleep:"sleeps", study:"studies", know:"knows", live:"lives", come:"comes", help:"helps", call:"calls", stay:"stays", say:"says", look:"looks", make:"makes", take:"takes", get:"gets", see:"sees", watch:"watches", learn:"learns", feel:"feels", think:"thinks", write:"writes", teach:"teaches", wash:"washes", do:"does", fix:"fixes" };
+  const MODALS = new Set(["can","could","will","would","shall","should","may","might","must","do","does","did","is","am","are","was","were","not","don't","doesn't","didn't","don","doesnt","didnt"]);
+  const PAST = { go:"went", come:"came", eat:"ate", see:"saw", buy:"bought", take:"took", make:"made", get:"got", have:"had", do:"did", say:"said", think:"thought", write:"wrote", read:"read", speak:"spoke", sleep:"slept", win:"won", know:"knew", meet:"met", feel:"felt", find:"found" };
+
+  function agree(text) {
+    const out = [], push = (original, fix, why) => out.push({ original, fix, why });
+    const sp = String(text).toLowerCase();
+    // 1) مطابقة الفعل مع he/she/it
+    const re3 = /\b(he|she|it)\s+([a-z]+)\b/g; let m3;
+    while (out.length < 2 && (m3 = re3.exec(sp))) {
+      const subj = m3[1], v = m3[2];
+      if (!V3[v]) continue;
+      const before = (sp.slice(0, m3.index).trim().split(/\s+/).pop() || "").replace(/[.,!?]/g, "");
+      if (MODALS.has(before)) continue;
+      const orig = sp.slice(m3.index, m3.index + m3[0].length);
+      push(orig, `${subj} ${V3[v]}`, `مع ${subj} الفعل ينتهي بـ s/es: play → plays.`);
+      break;
+    }
+    // 2) أدوات الربط الضميرية
+    const BE = [
+      [/\bi\s+(?:is|are)\b/i, "I am"],
+      [/\b(he|she|it)\s+(?:am|are)\b/i, "he is"],
+      [/\byou\s+(?:is|am)\b/i, "you are"],
+      [/\bwe\s+(?:is|am)\b/i, "we are"],
+      [/\bthey\s+(?:is|am)\b/i, "they are"]
+    ];
+    for (const [re, fx] of BE) {
+      if (out.length >= 4) break;
+      const mb = sp.match(re);
+      if (mb) push(mb[0], fx, `كل ضمير له فعل مناسب: ${fx}.`);
+    }
+    // 3) أسئلة wh + الفاعل
+    const WH = [
+      ["what", "(?:want|need|like|do|mean|study|eat)"],
+      ["where", "(?:live|work|study|go|stay)"],
+      ["when", "(?:wake|go|come|start|finish|leave)"],
+      ["how", "(?:feel|spell|say|do|make|reach)"],
+      ["why", "(?:go|come|want|like|leave)"]
+    ];
+    for (const [wh, verbs] of WH) {
+      if (out.length >= 4) break;
+      const reW = new RegExp("\\b(" + wh + ")\\s+(you|we|they)\\s+(" + verbs + ")\\b", "i");
+      const mw = sp.match(reW);
+      if (mw && !/[?؟]/.test(mw[0])) push(mw[0], `do ${mw[2]} ${mw[3]}`, `السؤال يحتاج do: ${mw[1]} do ${mw[2]} ${mw[3]}?`);
+    }
+    // 4) زمن الماضي مع ظرف زمن
+    const reT = /\b(yesterday|last night|last week|last month|last year|two days ago|three days ago|ago)\s+(i|we|you|they|he|she)\s+(go|goes|come|comes|eat|eats|see|sees|buy|buys|take|takes)\b/;
+    const mt = sp.match(reT);
+    if (mt && out.length < 4 && PAST[mt[3].replace(/s$/, "")]) {
+      const base = mt[3].replace(/s$/, "");
+      push(mt[0], `${mt[1]} ${mt[2]} ${PAST[base]}`, `مع ${mt[1]} نستعمل الماضي: ${PAST[base]}.`);
+    }
+    // 5) have + التصريف الثالث
+    const mh = sp.match(/\bhave (?:went|goed|eated|buyed|taked|sawed)\b/);
+    if (mh && out.length < 4) {
+      push(mh[0], "have + التصريف الثالث (gone/eaten/bought)", "بعد have نستعمل التصريف الثالث: have gone.");
+    }
+    // 6) am/is/are + فعل أساسي ⇒ +ing
+    const reG = /\b(i|you|we|they|he|she)\s+(am|is|are)\s+(go|come|eat|play|watch|read|write|swim|run|look|make|take|buy|study|work|speak|talk|sleep)\b/i;
+    const mg = sp.match(reG);
+    if (mg && out.length < 4) {
+      push(mg[0], `${mg[2]} ${mg[3]}ing`, "مع الفعل المستمر نضيف ing: is playing.");
+    }
+    return out;
+  }
+
   function correct(text) {
     const out = [], seen = new Set();
+    const push = o => {
+      if (!o || !o.original) return;
+      const key = String(o.original).toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(o);
+    };
     for (const c of CORRECTIONS) {
       const m = text.match(c.bad);
       if (!m) continue;
-      const key = m[0].toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
       let fix = c.fix;
       if (m[1] && /\$\{?1\}?/.test(fix)) fix = fix.replace(/\$\{?1\}?/, m[1]);
-      out.push({ original: m[0], fix, why: c.why });
+      push({ original: m[0], fix, why: c.why });
       if (out.length >= 4) break;
     }
+    if (out.length < 4) for (const o of agree(text)) { push(o); if (out.length >= 4) break; }
     return out;
   }
 

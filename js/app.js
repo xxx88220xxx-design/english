@@ -324,12 +324,12 @@ function load() {
     const d = JSON.parse(localStorage.getItem(LS) || "{}");
     return Object.assign({
       theme: "dark", lvl: "all", deck: "due", flipBack: false,
-      known: {}, weak: {}, seen: {}, stars: {}, units: {},
+      known: {}, weak: {}, seen: {}, stars: {}, units: {}, srs: {},
       quiz: { best: 0, taken: 0, score: 0 },
       diff: "mid",
       streak: 0, lastDay: "", chat: [], daily: {}, muted: false, engine: "auto", ac: "GB", rate: 0.9
     }, d);
-  } catch (e) { return { known:{}, weak:{}, seen:{}, stars:{}, units:{}, quiz:{best:0,taken:0,score:0}, streak:0, lastDay:"", chat:[], daily:{}, muted:false, engine:"auto", ac:"GB", rate:0.9, theme:"dark", lvl:"all", deck:"due", flipBack:false, diff:"mid" }; }
+  } catch (e) { return { known:{}, weak:{}, seen:{}, stars:{}, units:{}, srs:{}, quiz:{best:0,taken:0,score:0}, streak:0, lastDay:"", chat:[], daily:{}, muted:false, engine:"auto", ac:"GB", rate:0.9, theme:"dark", lvl:"all", deck:"due", flipBack:false, diff:"mid" }; }
 }
 function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
 
@@ -786,6 +786,31 @@ function markWrong(en) {
   save();
 }
 
+/* ---------- التكرار المتباعد (SRS) ---------- */
+const SRS_LVLS = [0, 1, 3, 7, 14, 30, 90];
+function srsGet(en) { return (S.srs || {})[en] || null; }
+function srsDue(en) {
+  const e = srsGet(en);
+  if (!e) return false;
+  if (S.known[en]) return false;
+  if (!S.seen[en]) return false;
+  return e.due <= todayKey();
+}
+function srsPromote(en, easy) {
+  if (!en) return;
+  S.srs = S.srs || {};
+  const e = srsGet(en) || { lvl: 0, due: todayKey() };
+  const nl = Math.min(SRS_LVLS.length - 1, (e.lvl || 0) + (easy ? 2 : 1));
+  S.srs[en] = { lvl: nl, due: dkey(Date.now() + SRS_LVLS[nl] * 864e5) };
+  save();
+}
+function srsReset(en) {
+  if (!en) return;
+  S.srs = S.srs || {};
+  S.srs[en] = { lvl: 0, due: todayKey() };
+  save();
+}
+
 /* ---------- إحصائيات الأسبوع (السبت → الجمعة) ---------- */
 function weekInfo() {
   const names = ["ح", "ن", "ث", "ر", "خ", "ج", "س"];   // السبت..الجمعة
@@ -1072,7 +1097,7 @@ function bindSays(root) {
 let deck = [], deckIdx = 0, flipped = false;
 RENDER.cards = function () {
   const all = allWords();
-  const due = all.filter(x => S.seen[x.w.en] && !S.known[x.w.en]);
+  const due = all.filter(x => S.seen[x.w.en] && !S.known[x.w.en]).sort((a, b) => (srsDue(b.w.en) ? 1 : 0) - (srsDue(a.w.en) ? 1 : 0));
   const nw = all.filter(x => !S.seen[x.w.en]);
   const wk = all.filter(x => S.weak[x.w.en] && !S.known[x.w.en]);
   $("#dueN").textContent = due.length; $("#newN").textContent = nw.length;
@@ -1081,7 +1106,7 @@ RENDER.cards = function () {
   let pick = map[S.deck];
   if (!pick || !pick.length) pick = nw.length ? nw : all;   // لا تترك المستخدم بلا بطاقات
   deck = pick.slice();
-  deck = shuffle(deck);
+  deck = S.deck === "due" ? pick : shuffle(deck);
   deckIdx = 0; flipped = false;
   showCard();
 }
@@ -1120,6 +1145,7 @@ function grade(g) {
   if (g === 3) { S.known[k] = 1; delete S.weak[k]; markLearned(k); }
   else if (g === 1) { S.known[k] = 0; delete S.known[k]; S.weak[k] = 1; }
   else { S.weak[k] = 1; }
+  if (g === 1) srsReset(k); else if (g === 2) srsPromote(k, false); else if (g === 3) srsPromote(k, true);
   bumpActivity();
   let c = 0; it.u.words.forEach(w => { if (S.known[w.en]) c++; });
   markUnit(it.u.id, c);
@@ -1460,8 +1486,8 @@ function finish(ok, q, msg) {
     }
   }
   // كلمات الأخطاء تبقى في البطاقات الضعيفة
-  if (!ok && q.say) { S.seen[q.say] = (S.seen[q.say] || 0) + 1; S.weak[q.say] = 1; delete S.known[q.say]; markWrong(q.say); save(); }
-  if (ok && q.key) { if (!S.known[q.key]) markLearned(q.key); save(); }
+  if (!ok && q.say) { S.seen[q.say] = (S.seen[q.say] || 0) + 1; S.weak[q.say] = 1; delete S.known[q.say]; markWrong(q.say); srsReset(q.say); save(); }
+  if (ok && q.key) { if (!S.known[q.key]) markLearned(q.key); srsPromote(q.key, false); }
   const R = $("#qRow"); R.innerHTML = "";
   const nb = document.createElement("button");
   nb.className = "btn"; nb.textContent = Q.i + 1 >= Q.list.length ? "🏁 النتيجة" : "التالي ⬅";
@@ -1633,7 +1659,9 @@ function renderScen() {
     <div class="step-dots" id="sDots"></div>
     <div class="scen-log" id="sLog"></div>
     <div id="sHint"></div>
+    <div id="sLive" class="live-fix"></div>
     <form class="scen-in" id="sForm">
+      <button type="button" class="icon mic" id="sMicBtn" title="تحدث">🎤</button>
       <input type="text" id="sIn" placeholder="اكتب ردك بالإنجليزية…" autocomplete="off">
       <button class="send">➤</button>
     </form>
@@ -1644,7 +1672,13 @@ function renderScen() {
     </div>
   </div>`;
   paintScen();
-  $("#sForm").onsubmit = e => { e.preventDefault(); scenAnswer(); };
+  $("#sForm").onsubmit = e => { e.preventDefault(); hideLive(); scenAnswer(); };
+  const sm = $("#sMicBtn");
+  if (sm) sm.onclick = () => startMic($("#sMicBtn"),
+    t => { const i = $("#sIn"); i.value = t; i.selectionStart = i.selectionEnd = (t || "").length; },
+    () => scenAnswer());
+  const sIn = $("#sIn");
+  if (sIn) sIn.addEventListener("input", () => liveCheck(sIn));
   $("#sHintBtn").onclick = () => {
     const t = SC.s.turns[SC.step];
     $("#sHint").innerHTML = t ? `<div class="hint-box">💡 ${esc(t.hint)}</div>` : "";
@@ -2056,7 +2090,10 @@ function buildDailyPlan(force) {
   if (!force && S.plan && S.plan.date === t) return;
   const order = priorityWords();
   const notNew = S.plan && S.plan.date === t;
-  const review = order.filter(x => S.weak[x.w.en] && !S.known[x.w.en]).slice(0, 10).map(x => x.w.en);
+  const fresh = order.filter(x => !S.known[x.w.en]);
+  const due = fresh.filter(x => srsDue(x.w.en)).map(x => x.w.en);
+  const weak = fresh.filter(x => !srsDue(x.w.en) && S.weak[x.w.en] && S.seen[x.w.en]).map(x => x.w.en);
+  const review = due.concat(weak).filter((v, i, a2) => a2.indexOf(v) === i).slice(0, 10);
   const newWords = order.filter(x => !S.seen[x.w.en] && !S.known[x.w.en]).slice(0, S.goal).map(x => x.w.en);
   S.plan = { date: t, review, new: newWords, words: newWords.concat(review), done: (notNew && S.plan.done) || false };
   save();
@@ -2256,6 +2293,56 @@ function playListen() {
 function pauseListen() { LIST.playing = false; if (LIST.timer) { clearInterval(LIST.timer); LIST.timer = null; } if (window.speechSynthesis) speechSynthesis.cancel(); }
 function stopListen() { pauseListen(); LIST.i = 0; }
 
+/* ---------- الصوت: إملاء في المحادثة والتمثيل + التصحيح الفوري ---------- */
+let REC = null, liveT = null;
+function stopMic(btn) {
+  if (REC) { try { REC.stop(); } catch (e) {} REC = null; }
+  if (btn) btn.classList.remove("rec");
+}
+function startMic(btn, onTyping, onFinal) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast("متصفحك لا يدعم التعرف على الصوت — جرّب Chrome"); return; }
+  if (REC) { stopMic(btn); return; }
+  const r = new SR(); REC = r;
+  r.lang = "en-US"; r.interimResults = true; r.maxAlternatives = 1; r.continuous = false;
+  let last = "";
+  btn.classList.add("rec");
+  r.onresult = e => {
+    let t = "";
+    for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+    last = t.trim();
+    if (onTyping) onTyping(last);
+  };
+  r.onerror = e => {
+    if (e.error === "not-allowed") toast("سمِّح بالمايك من المتصفح ثم أعد المحاولة");
+    else if (e.error !== "aborted" && e.error !== "no-speech") {
+      toast("لم أفهم الصوت — حاول مرة أخرى");
+      if (onTyping) onTyping("");
+    }
+  };
+  r.onend = () => { stopMic(btn); if (last) onFinal && onFinal(last); };
+  try { r.start(); } catch (e) { stopMic(btn); }
+}
+function hideLive() { ["chatLive", "sLive"].forEach(id => { const el = $("#" + id); if (el) el.style.display = "none"; }); }
+function liveCheck(inp) {
+  const el = inp && inp.id === "chatInput" ? $("#chatLive") : $("#sLive");
+  if (!el) return;
+  clearTimeout(liveT);
+  const v = (inp.value || "").trim();
+  liveT = setTimeout(() => {
+    if (!v || !/[a-z]/i.test(v)) { el.style.display = "none"; return; }
+    const fixes = window.AI.correct(v);
+    if (!fixes.length) { el.style.display = "none"; return; }
+    const f = fixes[0];
+    const applyable = /^[\x20-\x7E]+$/.test(f.fix) && v.indexOf(f.original) !== -1;
+    el.innerHTML = `⚡ <span>${esc(f.original)}</span> → <b>${esc(f.fix)}</b><span class="why">${esc(f.why)}</span>` +
+      (applyable ? ` <button type="button" class="btn sm live-fix-btn">استعمل</button>` : "");
+    el.style.display = "flex";
+    const b = el.querySelector(".live-fix-btn");
+    if (b) b.onclick = () => { inp.value = v.replace(f.original, f.fix); hideLive(); inp.focus(); };
+  }, 550);
+}
+
 function init() {
   setTheme(S.theme || "dark");
   touchDay();
@@ -2314,19 +2401,12 @@ function init() {
     toast("↩️ رجعت لباقي كلمات الموقع (" + quizPool().length + " كلمة)");
   };
   // chat
-  $("#chatForm").onsubmit = e => { e.preventDefault(); sendChat(); };
+  $("#chatForm").onsubmit = e => { e.preventDefault(); hideLive(); sendChat(); };
   $("#clearChat").onclick = () => { if (confirm("مسح المحادثة؟")) { S.chat = []; save(); RENDER.chat(); } };
   $$("#chatSeg button").forEach(b => b.onclick = () => { $$("#chatSeg button").forEach(x => x.classList.remove("on")); b.classList.add("on"); chatMode = b.dataset.cl; paintChips(); });
-  $("#micBtn").onclick = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { toast("متصفحك لا يدعم التعرف على الصوت — اكتب بدلاً من ذلك"); return; }
-    const r = new SR(); r.lang = "en-US"; r.interimResults = false;
-    $("#micBtn").classList.add("rec");
-    r.onresult = e => { $("#chatInput").value = e.results[0][0].transcript; $("#micBtn").classList.remove("rec"); sendChat(); };
-    r.onerror = () => { $("#micBtn").classList.remove("rec"); toast("لم أفهم الصوت — حاول مرة أخرى"); };
-    r.onend = () => $("#micBtn").classList.remove("rec");
-    try { r.start(); } catch (e) { $("#micBtn").classList.remove("rec"); }
-  };
+  $("#micBtn").onclick = () => startMic($("#micBtn"), t => { const i = $("#chatInput"); i.value = t; i.selectionStart = i.selectionEnd = (t || "").length; $("#botStat").textContent = "أصغٍ إليك…"; }, () => { $("#botStat").textContent = "جاهز للمحادثة"; sendChat(); });
+  const chatIn = $("#chatInput");
+  chatIn && chatIn.addEventListener("input", () => liveCheck(chatIn));
   // splash
   setTimeout(() => {
     const sp = $("#splash"); if (sp) sp.classList.add("gone");

@@ -369,6 +369,11 @@ html[data-theme="light"] .fc-ex{background:rgba(255,255,255,.55)}
 .chat-in input:focus{border-color:var(--ac)}
 .send{width:42px;height:42px;border-radius:50%;background:var(--ac);color:#fff;font-size:17px;display:grid;place-items:center;flex:none}
 .mic.rec{background:var(--bad);animation:pulse 1s infinite}
+
+/* تصحيح فوري أثناء الكتابة */
+.live-fix{display:none;align-items:center;gap:8px;margin:8px 12px 0;padding:8px 12px;border-radius:9px;background:color-mix(in srgb,var(--warn) 16%,transparent);font-size:13px;flex-wrap:wrap;border-inline-start:3px solid var(--warn)}
+.live-fix .why{color:var(--tx2);font-size:12px;flex:1 1 100%}
+.live-fix b{color:var(--ok)}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(248,81,73,.6)}70%{box-shadow:0 0 0 12px rgba(248,81,73,0)}}
 .hint-line{text-align:center;font-size:12px;color:var(--tx3);padding:0 12px 10px;background:var(--bg)}
 
