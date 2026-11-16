@@ -725,7 +725,7 @@ RENDER.sound = function () {
 /* ---------- السمة ---------- */
 function setTheme(t) {
   S.theme = t; document.documentElement.setAttribute("data-theme", t);
-  const m = $('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#fffaf3" : "#18142a";
+  const m = $('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#f4ece0" : "#1e1611";
   const b = $("#themeBtn"); if (b) b.innerHTML = t === "light" ? "☀️ الوضع النهاري" : "🌙 الوضع الليلي";
   save();
 }
